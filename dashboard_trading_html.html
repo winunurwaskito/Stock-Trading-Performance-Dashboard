@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Performance Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+            color: #e2e8f0; /* slate-200 */
+        }
+        
+        /* Custom Scrollbar for Chat */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5); 
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Chart container constraint */
+        .chart-container {
+            position: relative;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 selection:bg-blue-500/30">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-white flex items-center">
+                    <i class="fa-solid fa-chart-line mr-3 text-blue-500"></i>
+                    Trading Performance
+                </h1>
+                <p class="text-slate-400 mt-1">E07979 Account Dashboard &bull; 2021 - 2026</p>
+            </div>
+            
+            <div id="year-filters" class="flex bg-slate-800 rounded-lg p-1 border border-slate-700 w-full md:w-auto overflow-x-auto">
+                <!-- Tombol tahun akan di-render via JS -->
+            </div>
+        </header>
+
+        <!-- File Uploader Section -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg mb-6">
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="flex-1">
+                    <h2 class="text-lg font-bold text-white mb-2 flex items-center">
+                        <i class="fa-solid fa-file-excel mr-2 text-blue-400"></i>
+                        Data Source (SOA Files)
+                    </h2>
+                    <p class="text-slate-400 text-sm mb-4">
+                        Upload your Statement of Account `.xls` files to update the dashboard with real data. The dashboard currently displays simulated data spanning the dates of your files.
+                    </p>
+                    
+                    <input type="file" id="file-upload-mock" multiple accept=".xls,.xlsx" class="hidden" onchange="handleFileChange(event)" />
+                    
+                    <button onclick="document.getElementById('file-upload-mock').click()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center shadow-lg shadow-blue-500/20">
+                        <i class="fa-solid fa-upload mr-2"></i>
+                        Upload SOA Files
+                    </button>
+                </div>
+                
+                <div class="flex-1 bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-3" id="upload-status-text">Expected Files (0/6)</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="expected-files-list">
+                        <!-- File list di-render via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="kpi-container">
+            <!-- Cards akan di-update via JS -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="kpi-equity"></div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="kpi-roi"></div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="kpi-winrate"></div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="kpi-drawdown"></div>
+        </div>
+
+        <!-- Gemini AI Assistant -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg mb-6">
+            <div class="flex items-center mb-6">
+                <div class="p-2 bg-purple-500/20 rounded-lg mr-3">
+                    <i class="fa-solid fa-wand-magic-sparkles text-purple-400 text-xl"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Gemini AI Assistant</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- AI Summary Panel -->
+                <div class="bg-slate-900/60 rounded-xl p-5 border border-slate-700/60 flex flex-col min-h-[400px]">
+                    <h3 class="text-md font-semibold text-white mb-4 flex items-center">
+                        <i class="fa-solid fa-file-alt mr-2 text-slate-400"></i>
+                        Executive Summary
+                    </h3>
+                    
+                    <div class="flex-1 flex flex-col justify-center relative" id="ai-summary-container">
+                        <!-- Konten Summary State -->
+                        <div id="ai-summary-idle" class="text-center py-8">
+                            <i class="fa-solid fa-robot text-5xl text-slate-600 mb-4 mx-auto block"></i>
+                            <p class="text-slate-400 text-sm mb-6">Generate a comprehensive AI-driven report based on your current portfolio data, returns, and allocations.</p>
+                            <button onclick="generateAIAnalysis()" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-purple-500/20 inline-flex items-center">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Generate AI Report
+                            </button>
+                        </div>
+
+                        <div id="ai-summary-loading" class="hidden flex-col items-center justify-center text-purple-400 space-y-3 py-8 absolute inset-0 bg-slate-900/60 z-10">
+                            <i class="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+                            <p class="text-sm font-medium">Analyzing portfolio metrics...</p>
+                        </div>
+
+                        <div id="ai-summary-result" class="hidden flex-col h-full">
+                            <div id="ai-summary-text" class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap bg-slate-800/50 p-4 rounded-lg border border-slate-700/50 h-full overflow-y-auto custom-scrollbar"></div>
+                            <button onclick="generateAIAnalysis()" class="mt-4 text-purple-400 hover:text-purple-300 text-xs font-medium self-end flex items-center transition-colors">
+                                <i class="fa-solid fa-robot mr-1"></i> Regenerate Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Chat Panel -->
+                <div class="bg-slate-900/60 rounded-xl border border-slate-700/60 flex flex-col h-[400px]">
+                    <div class="p-4 border-b border-slate-700/60 bg-slate-800/50 rounded-t-xl flex items-center justify-between">
+                        <h3 class="text-md font-semibold text-white flex items-center">
+                            <i class="fa-solid fa-robot mr-2 text-slate-400"></i> Ask AI About Your Data
+                        </h3>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar" id="chat-history">
+                        <!-- Chat messages di-render via JS -->
+                    </div>
+                    
+                    <form onsubmit="handleChatSubmit(event)" class="p-3 border-t border-slate-700/60 bg-slate-800/30 rounded-b-xl flex gap-2">
+                        <input type="text" id="chat-input" placeholder="e.g. Why is my win rate below 50%?" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors placeholder:text-slate-500" autocomplete="off" />
+                        <button type="submit" id="chat-submit-btn" class="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white p-2 rounded-lg transition-colors flex items-center justify-center w-10 h-10">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Charts Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Equity Curve -->
+            <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg">
+                <h3 class="text-lg font-semibold text-white mb-4">Cumulative Equity & Drawdown</h3>
+                <div class="chart-container h-80">
+                    <canvas id="equityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Asset Allocation -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg">
+                <h3 class="text-lg font-semibold text-white mb-4">Current Allocation</h3>
+                <div class="chart-container h-52 flex items-center justify-center">
+                    <canvas id="allocationChart"></canvas>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2" id="allocation-legend">
+                    <!-- Legend Pie Chart -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section: Monthly P&L & Recent Trades -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
+            <!-- Monthly P&L Chart -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg">
+                <h3 class="text-lg font-semibold text-white mb-4">Monthly P&L (Selected Period)</h3>
+                <div class="chart-container h-72">
+                    <canvas id="pnlChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Trades Table -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-white">Recent Transactions</h3>
+                    <div class="text-sm text-blue-400 hover:text-blue-300 cursor-pointer flex items-center">
+                        <i class="fa-solid fa-clock mr-1"></i> View Full History
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto flex-1 custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-700 text-slate-400 text-sm">
+                                <th class="pb-3 font-medium min-w-[90px]">Date</th>
+                                <th class="pb-3 font-medium">Symbol</th>
+                                <th class="pb-3 font-medium">Type</th>
+                                <th class="pb-3 font-medium text-right">Price</th>
+                                <th class="pb-3 font-medium text-right">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm" id="trades-table-body">
+                            <!-- Rows dari JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Konfigurasi API
+        const GEMINI_API_KEY = ""; // Masukkan API key jika ada
+        
+        // State Variabel
+        let selectedYear = 'All';
+        let uploadedFiles = [];
+        let chatHistoryData = [
+            { role: 'model', text: 'Hi! I am your AI Trading Assistant. Ask me anything about your portfolio performance or current holdings.' }
+        ];
+
+        const EXPECTED_FILES = [
+            "SOA_E07979_002026.xls",
+            "SOA_E07979_002025 (1).xls",
+            "SOA_E07979_002024 (1).xls",
+            "SOA_E07979_002023 (1).xls",
+            "SOA_E07979_002022 (1).xls",
+            "SOA_E07979_002021 (1).xls"
+        ];
+
+        const MOCK_HOLDINGS = [
+            { name: 'BBCA', value: 45000000, color: '#3b82f6' },
+            { name: 'BBRI', value: 35000000, color: '#10b981' },
+            { name: 'BMRI', value: 25000000, color: '#f59e0b' },
+            { name: 'TLKM', value: 15000000, color: '#ef4444' },
+            { name: 'ASII', value: 10000000, color: '#8b5cf6' },
+            { name: 'Cash', value: 8000000, color: '#64748b' },
+        ];
+
+        const MOCK_TRADES = [
+            { id: 'TRD-901', date: '2026-08-05', type: 'BUY', symbol: 'BBCA', qty: 100, price: 10200 },
+            { id: 'TRD-902', date: '2026-08-02', type: 'SELL', symbol: 'GOTO', qty: 5000, price: 54 },
+            { id: 'TRD-903', date: '2026-07-28', type: 'BUY', symbol: 'BMRI', qty: 200, price: 6800 },
+            { id: 'TRD-904', date: '2026-07-15', type: 'SELL', symbol: 'TLKM', qty: 300, price: 3100 },
+            { id: 'TRD-905', date: '2026-07-10', type: 'BUY', symbol: 'AMMN', qty: 50, price: 11500 },
+        ];
+
+        // Generator Data Mock
+        const generateHistoricalData = () => {
+            const data = [];
+            let equity = 100000000;
+            let highWaterMark = equity;
+            const startDate = new Date(2021, 0, 1);
+            const endDate = new Date(2026, 7, 1);
+            
+            let currentDate = new Date(startDate);
+            
+            while (currentDate <= endDate) {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                
+                let expectedReturn = 0.01;
+                let volatility = 0.05;
+                
+                if (year === 2021) { expectedReturn = 0.02; volatility = 0.06; }
+                if (year === 2022) { expectedReturn = -0.01; volatility = 0.08; }
+                if (year === 2023) { expectedReturn = 0.015; volatility = 0.04; }
+                if (year === 2024) { expectedReturn = 0.025; volatility = 0.05; }
+                if (year === 2025) { expectedReturn = 0.01; volatility = 0.04; }
+                if (year === 2026) { expectedReturn = 0.015; volatility = 0.06; }
+                
+                const u1 = Math.random();
+                const u2 = Math.random();
+                const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+                const monthlyReturn = expectedReturn + z0 * volatility;
+                
+                const pnl = equity * monthlyReturn;
+                equity += pnl;
+                
+                if (equity > highWaterMark) highWaterMark = equity;
+                const drawdown = ((highWaterMark - equity) / highWaterMark) * 100;
+
+                data.push({
+                    date: `${year}-${String(month + 1).padStart(2, '0')}`,
+                    year: year,
+                    equity: Math.max(equity, 0),
+                    pnl: pnl,
+                    drawdown: -drawdown,
+                    win: pnl > 0 ? 1 : 0
+                });
+                
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+            return data;
+        };
+
+        const MOCK_DATA = generateHistoricalData();
+        let chartInstances = {};
+
+        const formatCurrency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+        const formatShortCurrency = (value) => {
+            if (value >= 1000000) return `Rp ${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `Rp ${(value / 1000).toFixed(1)}K`;
+            return `Rp ${value.toFixed(0)}`;
+        };
+        const formatPercent = (value) => `${(value * 100).toFixed(2)}%`;
+
+        function getFilteredData() {
+            if (selectedYear === 'All') return MOCK_DATA;
+            return MOCK_DATA.filter(d => d.year.toString() === selectedYear);
+        }
+
+        function renderYearFilters() {
+            const years = ['All', '2021', '2022', '2023', '2024', '2025', '2026'];
+            const container = document.getElementById('year-filters');
+            container.innerHTML = years.map(year => `
+                <button onclick="setYear('${year}')" class="px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${selectedYear === year ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'}">
+                    ${year}
+                </button>
+            `).join('');
+        }
+
+        function setYear(year) {
+            selectedYear = year;
+            renderYearFilters();
+            updateDashboard();
+        }
+
+        function handleFileChange(event) {
+            if (event.target.files.length > 0) {
+                const newFiles = Array.from(event.target.files).map(f => f.name);
+                uploadedFiles = [...new Set([...uploadedFiles, ...newFiles])];
+                renderExpectedFiles();
+            }
+        }
+
+        function renderExpectedFiles() {
+            document.getElementById('upload-status-text').innerText = `Expected Files (${uploadedFiles.length}/${EXPECTED_FILES.length})`;
+            const container = document.getElementById('expected-files-list');
+            container.innerHTML = EXPECTED_FILES.map(file => {
+                const isUploaded = uploadedFiles.includes(file);
+                return `
+                    <div class="flex items-center space-x-2 text-xs">
+                        <i class="fa-solid ${isUploaded ? 'fa-check-circle text-emerald-500' : 'fa-file-excel text-slate-500'} shrink-0"></i>
+                        <span class="truncate ${isUploaded ? 'text-slate-300 line-through opacity-70' : 'text-slate-400'}">${file}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTradesTable() {
+            const tbody = document.getElementById('trades-table-body');
+            tbody.innerHTML = MOCK_TRADES.map(trade => `
+                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                    <td class="py-3 text-slate-300 whitespace-nowrap">${trade.date}</td>
+                    <td class="py-3 font-semibold text-white">${trade.symbol}</td>
+                    <td class="py-3">
+                        <span class="px-2 py-1 rounded text-[10px] sm:text-xs font-bold ${trade.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">${trade.type}</span>
+                    </td>
+                    <td class="py-3 text-right text-slate-300 whitespace-nowrap">Rp ${trade.price.toLocaleString('id-ID')}</td>
+                    <td class="py-3 text-right text-slate-300 font-medium whitespace-nowrap">Rp ${(trade.qty * trade.price).toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+        }
+
+        function generateKPICard(title, value, subValue, icon, trend, trendValue) {
+            const trendClass = trend === 'up' ? 'text-emerald-400' : 'text-rose-400';
+            const trendIcon = trend === 'up' ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
+            return `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-slate-400 text-sm font-medium mb-1">${title}</p>
+                        <h3 class="text-2xl font-bold text-white truncate">${value}</h3>
+                        ${subValue ? `<p class="text-slate-500 text-xs mt-1 truncate">${subValue}</p>` : ''}
+                    </div>
+                    <div class="p-3 bg-slate-700/50 rounded-lg text-blue-400">
+                        <i class="fa-solid ${icon} text-xl"></i>
+                    </div>
+                </div>
+                ${trend ? `
+                <div class="flex items-center text-sm ${trendClass}">
+                    <i class="fa-solid ${trendIcon} mr-1"></i>
+                    <span class="font-medium whitespace-nowrap">${trendValue}</span>
+                    <span class="text-slate-500 ml-2 hidden sm:inline">vs prev</span>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        function updateKPIs(data) {
+            if (data.length === 0) return;
+            const currentEquity = data[data.length - 1].equity;
+            const startEquity = data[0].equity;
+            const totalReturn = (currentEquity - startEquity) / startEquity;
+            const totalMonths = data.length;
+            const winningMonths = data.filter(d => d.win === 1).length;
+            const winRate = winningMonths / totalMonths;
+            const maxDrawdown = Math.min(...data.map(d => d.drawdown));
+
+            document.getElementById('kpi-equity').innerHTML = generateKPICard("Total Equity", formatCurrency(currentEquity), null, "fa-dollar-sign", "up", "+1.2%");
+            document.getElementById('kpi-roi').innerHTML = generateKPICard("Net ROI", formatPercent(totalReturn), `Est. Profit: ${formatCurrency(currentEquity - startEquity)}`, "fa-arrow-trend-up", totalReturn >= 0 ? "up" : "down", "Since Start");
+            document.getElementById('kpi-winrate').innerHTML = generateKPICard("Win Rate (Monthly)", formatPercent(winRate), `${winningMonths} win / ${totalMonths} months`, "fa-chart-pie", winRate > 0.5 ? "up" : "down", winRate > 0.5 ? "Profitable" : "Needs work");
+            document.getElementById('kpi-drawdown').innerHTML = generateKPICard("Max Drawdown", `${maxDrawdown.toFixed(2)}%`, "Largest peak-to-trough", "fa-circle-exclamation", "down", "Managed Risk");
+        }
+
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = 'Inter';
+
+        function initCharts() {
+            // Equity Chart
+            const ctxEquity = document.getElementById('equityChart').getContext('2d');
+            chartInstances.equity = new Chart(ctxEquity, {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top', labels: { color: '#cbd5e1' } }, tooltip: { backgroundColor: '#1e293b', titleColor: '#f8fafc', bodyColor: '#f8fafc', borderColor: '#334155', borderWidth: 1 } },
+                    scales: {
+                        x: { grid: { color: '#334155', drawBorder: false } },
+                        y: { type: 'linear', display: true, position: 'left', grid: { color: '#334155' }, ticks: { callback: function(value) { return formatShortCurrency(value); } } },
+                        y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: function(value) { return value + '%'; } } }
+                    }
+                }
+            });
+
+            // Allocation Chart (Pie)
+            const ctxAlloc = document.getElementById('allocationChart').getContext('2d');
+            chartInstances.allocation = new Chart(ctxAlloc, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '70%',
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', bodyColor: '#f8fafc', callbacks: { label: function(context) { return ' ' + formatCurrency(context.raw); } } } }
+                }
+            });
+
+            // PnL Chart (Bar)
+            const ctxPnl = document.getElementById('pnlChart').getContext('2d');
+            chartInstances.pnl = new Chart(ctxPnl, {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', bodyColor: '#f8fafc', callbacks: { label: function(context) { return ' P&L: ' + formatCurrency(context.raw); } } } },
+                    scales: { x: { grid: { display: false } }, y: { grid: { color: '#334155' }, ticks: { callback: function(value) { return formatShortCurrency(value); } } } }
+                }
+            });
+        }
+
+        function updateCharts(data) {
+            const labels = data.map(d => d.date);
+            
+            // Update Equity
+            chartInstances.equity.data.labels = labels;
+            chartInstances.equity.data.datasets = [
+                { label: 'Portfolio Value', data: data.map(d => d.equity), borderColor: '#3b82f6', backgroundColor: '#3b82f6', borderWidth: 2, yAxisID: 'y', tension: 0.1, pointRadius: 0, pointHoverRadius: 5 },
+                { label: 'Drawdown', data: data.map(d => d.drawdown), borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1.5, yAxisID: 'y1', stepline: true, fill: true, pointRadius: 0 }
+            ];
+            chartInstances.equity.update();
+
+            // Update Allocation
+            const allocLabels = MOCK_HOLDINGS.map(h => h.name);
+            const allocData = MOCK_HOLDINGS.map(h => h.value);
+            const allocColors = MOCK_HOLDINGS.map(h => h.color);
+            chartInstances.allocation.data.labels = allocLabels;
+            chartInstances.allocation.data.datasets = [{ data: allocData, backgroundColor: allocColors, borderWidth: 0 }];
+            chartInstances.allocation.update();
+            
+            // Render Pie Legend
+            const totalEq = data[data.length - 1].equity;
+            document.getElementById('allocation-legend').innerHTML = MOCK_HOLDINGS.map(h => `
+                <div class="flex items-center text-sm">
+                    <div class="w-3 h-3 rounded-full mr-2 shrink-0" style="background-color: ${h.color}"></div>
+                    <span class="text-slate-300 flex-1 truncate">${h.name}</span>
+                    <span class="text-slate-400 font-medium">${Math.round((h.value / totalEq) * 100)}%</span>
+                </div>
+            `).join('');
+
+            // Update PnL
+            chartInstances.pnl.data.labels = labels;
+            chartInstances.pnl.data.datasets = [{
+                label: 'Net P&L',
+                data: data.map(d => d.pnl),
+                backgroundColor: data.map(d => d.pnl >= 0 ? '#10b981' : '#ef4444'),
+                borderRadius: 2
+            }];
+            chartInstances.pnl.update();
+        }
+
+        function getPortfolioContext() {
+            const data = getFilteredData();
+            if (data.length === 0) return "";
+            const currentEquity = data[data.length - 1].equity;
+            const startEquity = data[0].equity;
+            const winRate = data.filter(d => d.win === 1).length / data.length;
+            const maxDrawdown = Math.min(...data.map(d => d.drawdown));
+            
+            return `PORTFOLIO CONTEXT:
+- Current Equity: ${formatCurrency(currentEquity)}
+- Initial Equity: ${formatCurrency(startEquity)}
+- Monthly Win Rate: ${formatPercent(winRate)}
+- Max Drawdown: ${maxDrawdown.toFixed(2)}%
+- Period: ${selectedYear}
+- Holdings: ${MOCK_HOLDINGS.map(h => `${h.name} (${formatCurrency(h.value)})`).join(', ')}`;
+        }
+
+        async function generateAIAnalysis() {
+            document.getElementById('ai-summary-idle').classList.add('hidden');
+            document.getElementById('ai-summary-result').classList.add('hidden');
+            document.getElementById('ai-summary-loading').classList.remove('hidden');
+            document.getElementById('ai-summary-loading').classList.add('flex');
+
+            try {
+                if (!GEMINI_API_KEY) throw new Error("API Key empty");
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+                const sysPrompt = "You are a professional quantitative trading analyst. Provide a concise, insightful 2-paragraph summary of the user's trading portfolio performance based strictly on the provided context. Highlight strengths and risks. Keep the tone objective.";
+                const usrPrompt = `Analyze this:\n${getPortfolioContext()}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: usrPrompt }] }], systemInstruction: { parts: [{ text: sysPrompt }] } })
+                });
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "No insights returned.";
+                showSummary(text);
+            } catch (error) {
+                console.error(error);
+                let fallbackMsg = "An error occurred fetching AI insights.";
+                if(error.message === "API Key empty") fallbackMsg = "API Key belum diset di dalam kode HTML. Silakan isi variabel GEMINI_API_KEY untuk mengaktifkan fitur AI sesungguhnya.\n\n[MOCK AI REPORT]\nBerdasarkan data simulasi, performa portofolio Anda menunjukkan hasil yang stabil dengan win rate yang terkontrol. Drawdown terjaga pada batas wajar.";
+                showSummary(fallbackMsg);
+            }
+        }
+
+        function showSummary(text) {
+            document.getElementById('ai-summary-loading').classList.add('hidden');
+            document.getElementById('ai-summary-loading').classList.remove('flex');
+            document.getElementById('ai-summary-result').classList.remove('hidden');
+            document.getElementById('ai-summary-result').classList.add('flex');
+            document.getElementById('ai-summary-text').innerText = text;
+        }
+
+        function renderChat() {
+            const container = document.getElementById('chat-history');
+            container.innerHTML = chatHistoryData.map(msg => `
+                <div class="flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="flex max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-blue-600 ml-3' : 'bg-purple-600 mr-3'}">
+                            <i class="fa-solid ${msg.role === 'user' ? 'fa-user' : 'fa-robot'} text-white text-xs"></i>
+                        </div>
+                        <div class="p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-700 text-slate-200 rounded-tl-none border border-slate-600'}">
+                            ${msg.text}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function handleChatSubmit(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('chat-input');
+            const submitBtn = document.getElementById('chat-submit-btn');
+            const text = inputEl.value.trim();
+            if (!text) return;
+
+            // Tambah user message
+            chatHistoryData.push({ role: 'user', text });
+            inputEl.value = '';
+            inputEl.disabled = true;
+            submitBtn.disabled = true;
+            
+            // Tambah loading dots message sementara
+            chatHistoryData.push({ role: 'model', text: '<i class="fa-solid fa-ellipsis fa-fade"></i> Memproses...' });
+            renderChat();
+
+            try {
+                if (!GEMINI_API_KEY) throw new Error("API Key empty");
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+                const sysPrompt = `You are a helpful AI Trading Assistant. Context: ${getPortfolioContext()} Keep answers brief (1-3 sentences).`;
+                const convo = chatHistoryData.filter(m => !m.text.includes('Memproses...')).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}`).join('\n');
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `${sysPrompt}\n\nChat:\n${convo}\nAssistant:` }] }] })
+                });
+                
+                const result = await response.json();
+                chatHistoryData.pop(); // Hapus loading
+                chatHistoryData.push({ role: 'model', text: result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, saya tidak mengerti." });
+            } catch (error) {
+                chatHistoryData.pop(); // Hapus loading
+                chatHistoryData.push({ role: 'model', text: "Simulasi Chat: Silakan isi GEMINI_API_KEY di dalam kode HTML untuk balasan AI yang sebenarnya." });
+            } finally {
+                inputEl.disabled = false;
+                submitBtn.disabled = false;
+                renderChat();
+                inputEl.focus();
+            }
+        }
+
+        function updateDashboard() {
+            const filtered = getFilteredData();
+            updateKPIs(filtered);
+            updateCharts(filtered);
+        }
+
+        window.onload = function() {
+            renderYearFilters();
+            renderExpectedFiles();
+            renderTradesTable();
+            renderChat();
+            initCharts();
+            updateDashboard();
+        };
+    </script>
+</body>
+</html>
